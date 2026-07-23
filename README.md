@@ -11,25 +11,23 @@
 
 </div>
 
-> **Yggdrasil** (*"L'albero cosmico che sostiene i mondi"*) is an automated **Active Directory and Windows Security Posture Auditor** designed to evaluate GPO password policies, account lockout thresholds, privileged account hygiene, and identify domain misconfigurations.
+> **Perché ho costruito Yggdrasil?**  
+> In molte realtà (specialmente PMI e medie imprese), Active Directory è il cuore pulsante dell'infrastruttura ma spesso soffre di configurazioni storiche mai riviste: policy password blande, account di servizio con privilegi eccessivi e password che non scadono dal 2021. Yggdrasil nasce per offrire un audit rapido, chiaro e orientato al rischio delle GPO e della postura di sicurezza AD.
 
 ---
 
-## Core Features
+## Funzionalità Principali
 
-| Component | Description |
-|:---|:---|
-| **Password Policy Audit** | Evaluates minimum length, complexity, history, and maximum age GPO settings |
-| **Privileged Account Hygiene** | Detects Domain Admins with 'Password Never Expires' or stale activity |
-| **Account Lockout Check** | Validates brute-force protection thresholds |
-| **Markdown Reporting** | Generates executive audit reports with scoring (0-100) and remediation playbooks |
+- **Audit Policy Password**: Verifica lunghezza minima, complessità e scadenze forzate.
+- **Igiene Account Privilegiati**: Intercetta account Domain Admin con opzione "Password mai scaduta" o inattivi da mesi.
+- **Reporting Esecutivo**: Genera un report Markdown con punteggio di sicurezza (0-100) e playbook di rimedio immediato.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Run AD security audit simulation
+# Esegui l'audit di simulazione sul dominio
 python main.py audit --domain corp.asgard.local
 ```
 
@@ -37,6 +35,6 @@ python main.py audit --domain corp.asgard.local
 
 <div align="center">
 
-**Built by [Fioru12](https://github.com/Fioru12)** — Distributed under the MIT License.
+**Sviluppato da [Fioru12](https://github.com/Fioru12)** — Parte della Suite Asgard.
 
 </div>
