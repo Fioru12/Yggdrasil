@@ -27,9 +27,44 @@
 ## Quick Start
 
 ```bash
-# Esegui l'audit di simulazione sul dominio
+# Esegui l'audit di simulazione sul dominio (dati mock, nessuna connessione richiesta)
 python main.py audit --domain corp.asgard.local
 ```
+
+---
+
+## Audit Reale via LDAP
+
+A partire da questa versione Yggdrasil può interrogare davvero un Domain Controller via LDAP/LDAPS (libreria `ldap3`, pura Python — nessuna toolchain nativa richiesta, funziona anche su Windows).
+
+```bash
+python main.py audit --no-simulate \
+  --domain corp.local \
+  --ldap-host dc01.corp.local \
+  --bind-dn "CN=svc-audit,OU=Service Accounts,DC=corp,DC=local" \
+  --base-dn "DC=corp,DC=local"
+```
+
+La password dell'account di bind può essere fornita in tre modi (in ordine di priorità):
+
+1. `--bind-password` (sconsigliato: resta visibile nella history/processi)
+2. variabile d'ambiente `YGGDRASIL_BIND_PASSWORD`
+3. prompt interattivo (`getpass`) se nessuna delle due precedenti è impostata
+
+Parametri principali:
+
+| Argomento | Descrizione |
+|---|---|
+| `--ldap-host` | Hostname o IP del Domain Controller (richiesto) |
+| `--ldap-port` | Porta LDAP (default `636`, LDAPS) |
+| `--bind-dn` | DN dell'account di bind |
+| `--bind-password` | Password di bind (preferire env var o prompt) |
+| `--base-dn` | Base DN del dominio, es. `DC=corp,DC=local` (richiesto) |
+| `--no-ssl` | Disabilita LDAPS e usa LDAP in chiaro (**sconsigliato**, stampa un warning) |
+
+**Sicurezza dell'account di bind**: per interrogare la password policy e i membri di "Domain Admins" è sufficiente un account con permessi di **sola lettura** sul dominio (un utente autenticato standard è già in grado di leggere questi attributi in una configurazione AD di default). Non usare mai un account Domain Admin o con privilegi di scrittura come account di servizio per l'audit — applicare il principio del minimo privilegio: un service account dedicato, membro solo dei gruppi di lettura strettamente necessari, con password gestita a parte (vault/secret manager) invece che in chiaro sulla riga di comando.
+
+Per default la connessione avviene via **LDAPS** (porta 636, cifrata). Se si forza `--no-ssl` il traffico, inclusa la password di bind, viaggia in chiaro: usarlo solo in ambienti di test isolati.
 
 ---
 

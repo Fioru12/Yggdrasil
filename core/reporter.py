@@ -1,6 +1,22 @@
 import os
+import re
 import datetime
 from typing import Dict, Any
+
+
+def _sanitize_domain_name(domain_name: str) -> str:
+    """
+    Sanitize a domain name for safe use inside a filesystem path segment.
+
+    domain_name can originate from CLI input (or, in a live-AD run, from
+    LDAP data) and is not guaranteed to be filesystem-safe. This whitelists
+    alphanumerics, dots and hyphens (the valid characters in a DNS domain
+    name) and replaces everything else (path separators, spaces, null
+    bytes, "..", etc.) with an underscore, preventing path traversal or
+    invalid-filename errors when the report file is created.
+    """
+    return re.sub(r"[^a-zA-Z0-9.\-]", "_", domain_name)
+
 
 class ADReporter:
     """
@@ -14,7 +30,8 @@ class ADReporter:
 
     def generate_report(self, domain_name: str, audit_result: Dict[str, Any]) -> str:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"yggdrasil_audit_{domain_name}_{timestamp}.md"
+        safe_domain_name = _sanitize_domain_name(domain_name)
+        filename = f"yggdrasil_audit_{safe_domain_name}_{timestamp}.md"
         filepath = os.path.join(self.output_dir, filename)
 
         score = audit_result["score"]

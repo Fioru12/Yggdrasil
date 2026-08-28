@@ -48,6 +48,36 @@ class ADAuditor:
                 "description": f"Lockout threshold is {lockout_threshold} (Recommended: 5 attempts)."
             })
 
+        if max_age == 0:
+            findings.append({
+                "category": "Password Policy",
+                "severity": "HIGH",
+                "title": "Password Never Expires (Domain-wide)",
+                "description": (
+                    "The domain password policy has 'maximum password age' set to 0 "
+                    "(passwords never expire). Combined with weak monitoring, a single "
+                    "compromised credential can remain valid indefinitely. Recommended: "
+                    "enforce a rotation interval of 60-90 days per NIST SP 800-63B, or, "
+                    "if adopting NIST's modern non-expiration guidance, ensure this is "
+                    "paired with mandatory MFA, breach-based forced resets, and active "
+                    "credential monitoring rather than left unmanaged by default."
+                )
+            })
+        elif max_age > 90:
+            findings.append({
+                "category": "Password Policy",
+                "severity": "MEDIUM",
+                "title": "Password Rotation Interval Too Long",
+                "description": (
+                    f"Maximum password age is set to {max_age} days (Recommended: 60-90 "
+                    "days per NIST SP 800-63B). Long rotation windows increase the "
+                    "exposure window for a compromised credential; if the domain instead "
+                    "intends to rely on non-expiring passwords, this should be an explicit "
+                    "decision backed by MFA and compromise-detection controls, not simply "
+                    "a large default value."
+                )
+            })
+
         return findings
 
     def audit_privileged_accounts(self, accounts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -88,7 +118,32 @@ class ADAuditor:
         high_count = sum(1 for f in all_findings if f["severity"] == "HIGH")
         medium_count = sum(1 for f in all_findings if f["severity"] == "MEDIUM")
 
-        score = max(0, 100 - (high_count * 20) - (medium_count * 10))
+        # --- Score calculation ---
+        # Domain-wide findings (password policy / account lockout) apply equally
+        # regardless of domain size, so they keep a flat per-finding weight.
+        pwd_high = sum(1 for f in pwd_findings if f["severity"] == "HIGH")
+        pwd_medium = sum(1 for f in pwd_findings if f["severity"] == "MEDIUM")
+
+        # Per-account findings (Privileged Accounts / Stale Accounts) are
+        # normalized against the size of the audited account population: two
+        # compromised admins out of 10 accounts is a far worse security posture
+        # than the same two compromised admins out of 10,000 accounts, so a flat
+        # per-finding weight would understate risk for small domains and
+        # overstate it for large ones. We scale the per-finding weight by
+        # ACCOUNT_SCORE_REFERENCE / total_accounts, capped at 1.0, so domains at
+        # or below the reference size keep the historical flat-weight scoring,
+        # while larger domains see proportionally reduced penalties for the same
+        # absolute number of compromised accounts.
+        ACCOUNT_SCORE_REFERENCE = 10
+        acc_high = sum(1 for f in acc_findings if f["severity"] == "HIGH")
+        acc_medium = sum(1 for f in acc_findings if f["severity"] == "MEDIUM")
+        total_accounts = max(1, len(accounts))
+        account_scale = min(1.0, ACCOUNT_SCORE_REFERENCE / total_accounts)
+
+        penalty = (pwd_high * 20) + (pwd_medium * 10) \
+            + (acc_high * 20 * account_scale) + (acc_medium * 10 * account_scale)
+
+        score = max(0, round(100 - penalty))
 
         return {
             "score": score,
