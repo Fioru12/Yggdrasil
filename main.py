@@ -104,12 +104,59 @@ def main():
                                help="Exit with status 1 if the final security score is below SCORE "
                                     "(after generating the report). Useful for CI/CD pipeline gating.")
 
+    entra_parser = subparsers.add_parser("entra", help="Run Microsoft 365 / Entra ID cloud security audit")
+    entra_parser.add_argument("--tenant", default="azienda.onmicrosoft.com", help="Target Microsoft 365 tenant domain")
+    entra_parser.add_argument("--input", default=None, help="Path to exported tenant configuration JSON")
+    entra_parser.add_argument("--simulate", action=argparse.BooleanOptionalAction, default=True, help="Use mock tenant data")
+
     args = parser.parse_args()
 
     if args.command == "audit":
         run_audit(args.domain, simulate=args.simulate, ldap_args=args, fail_under=args.fail_under)
+    elif args.command == "entra":
+        run_entra_audit(args.tenant, input_file=args.input, simulate=args.simulate)
     else:
         run_audit("corp.asgard.local", simulate=True)
+
+def run_entra_audit(tenant: str, input_file: str = None, simulate: bool = True):
+    import json
+    from core.entra_audit import EntraSecurityAuditor
+    print(Colors.CYAN + "=" * 65 + Colors.ENDC)
+    print(f"{Colors.BOLD} Yggdrasil - Microsoft 365 & Entra ID Security Auditor{Colors.ENDC}")
+    print(Colors.CYAN + "=" * 65 + Colors.ENDC)
+    print(f"{Colors.CYAN}[*]{Colors.ENDC} Tenant: {tenant}")
+
+    auditor = EntraSecurityAuditor(tenant_domain=tenant)
+    if input_file and os.path.exists(input_file):
+        with open(input_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        users = data.get("users", [])
+        roles = data.get("roles", [])
+        policies = data.get("policies", {})
+    else:
+        print(f"{Colors.WARNING}[!]{Colors.ENDC} Modalità simulazione / mock tenant M365...")
+        users = [
+            {"userPrincipalName": f"admin@{tenant}", "mfa_enabled": False, "accountEnabled": True, "is_global_admin": True},
+            {"userPrincipalName": f"support@{tenant}", "mfa_enabled": True, "accountEnabled": True, "is_global_admin": True},
+            {"userPrincipalName": f"utente1@{tenant}", "mfa_enabled": False, "accountEnabled": True, "is_global_admin": False},
+            {"userPrincipalName": f"guest_partner#EXT#@{tenant}", "userType": "Guest", "days_since_last_signin": 110, "mfa_enabled": True},
+        ]
+        roles = [{"displayName": "Global Administrator", "members": [users[0], users[1]]}]
+        policies = {"legacy_auth_allowed": True}
+
+    res = auditor.audit_tenant(users, roles, policies)
+    print(f"{Colors.CYAN}[*]{Colors.ENDC} Cloud Security Score: {Colors.BOLD}{res['score']}/100 ({res['posture']}){Colors.ENDC}")
+    print(f"    - Utenti analizzati: {res['total_users']}")
+    print(f"    - Vulnerabilità rilevate: {res['findings_count']}")
+
+    print("\n" + Colors.CYAN + "=" * 65 + Colors.ENDC)
+    print(f"{Colors.BOLD} DETTAGLIO CRITICITÀ CLOUD / ENTRA ID:{Colors.ENDC}")
+    for f in res["findings"]:
+        sev_color = Colors.RED if f['severity'] in ['CRITICAL', 'HIGH'] else Colors.YELLOW
+        print(f" - {sev_color}[{f['severity']}]{Colors.ENDC} {f['title']}")
+        print(f"   {f['description']}")
+        print(f"   Rimedio: {f['remediation']}")
+    print(Colors.CYAN + "=" * 65 + Colors.ENDC)
 
 if __name__ == "__main__":
     main()
