@@ -58,7 +58,7 @@ def _filetime_to_inactive_days(value: Any) -> int:
     information for the attribute is available)."""
     if isinstance(value, datetime.datetime):
         last_set = value
-        now = datetime.datetime.now(value.tzinfo) if value.tzinfo else datetime.datetime.utcnow()
+        now = datetime.datetime.now(value.tzinfo) if value.tzinfo else datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         delta = now - last_set
         return max(0, delta.days)
 
@@ -73,7 +73,8 @@ def _filetime_to_inactive_days(value: Any) -> int:
         last_set = epoch_start + datetime.timedelta(microseconds=ivalue / 10)
     except OverflowError:
         return 0
-    delta = datetime.datetime.utcnow() - last_set
+    now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    delta = now_utc - last_set
     return max(0, delta.days)
 
 
