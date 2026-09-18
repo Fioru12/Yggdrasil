@@ -16,7 +16,13 @@ from typing import Dict, List, Any, Optional
 class EntraSecurityAuditor:
     """
     Audits Microsoft Entra ID (Azure AD) and Microsoft 365 tenant configurations.
-    Can operate over live MS Graph data or offline JSON configuration exports.
+
+    Operates only on data you already have: a JSON export you provide via
+    --input, or simulated data if you don't. There is no Microsoft Graph API
+    connector anywhere in this module or the suite - it does not fetch
+    anything from a live tenant on its own. Producing that JSON export today
+    requires a separate script/PowerShell (e.g. via Microsoft Graph
+    PowerShell SDK) that this suite does not currently provide.
     """
 
     def __init__(self, tenant_domain: str = "tenant.onmicrosoft.com"):
