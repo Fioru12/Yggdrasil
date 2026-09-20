@@ -68,6 +68,42 @@ Per default la connessione avviene via **LDAPS** (porta 636, cifrata). Se si for
 
 ---
 
+## Audit Cloud Microsoft 365 / Entra ID
+
+Oltre all'Active Directory on-prem, Yggdrasil audita anche un tenant Microsoft 365 / Entra ID: adozione MFA, privilege sprawl sui Global Admin, autenticazione legacy abilitata, account guest inattivi.
+
+```bash
+# Simulazione (dati mock, nessuna connessione richiesta)
+python main.py entra --tenant azienda.onmicrosoft.com
+
+# Da un export JSON già disponibile (es. prodotto con Microsoft Graph PowerShell SDK)
+python main.py entra --tenant azienda.onmicrosoft.com --input export_tenant.json --no-simulate
+
+# Audit live su un tenant reale via Microsoft Graph
+python main.py entra --tenant azienda.onmicrosoft.com --live \
+  --tenant-id <GUID tenant> \
+  --client-id <GUID app registration>
+```
+
+`--live` autentica via OAuth2 client credentials flow (app-only, nessun utente collegato) usando `msal`. Richiede una **app registration Azure AD** con i seguenti permessi applicativi, con consenso amministratore concesso:
+
+| Permesso | A cosa serve |
+|---|---|
+| `User.Read.All` | Elenco utenti, stato account, tipo (member/guest) |
+| `RoleManagement.Read.Directory` | Membri del ruolo Global Administrator |
+| `Reports.Read.All` | Stato di registrazione MFA per utente |
+| `Policy.Read.All` | Policy di Conditional Access (per rilevare se l'autenticazione legacy è bloccata) |
+| `AuditLog.Read.All` | Data ultimo accesso (richiede licenza Azure AD Premium P1/P2 sul tenant; senza, Yggdrasil non inventa un dato e riporta l'informazione come sconosciuta) |
+
+Il client secret dell'app registration si passa in due modi (in ordine di priorità):
+
+1. `--client-secret` (sconsigliato: resta visibile nella history/processi)
+2. variabile d'ambiente `YGGDRASIL_GRAPH_CLIENT_SECRET`
+
+Se un permesso manca, la chiamata Graph corrispondente fallisce con un errore chiaro che nomina il permesso mancante — non con un risultato vuoto che si potrebbe scambiare per "tenant pulito".
+
+---
+
 <div align="center">
 
 **Sviluppato da [Fioru12](https://github.com/Fioru12)** — Parte della Suite Asgard.

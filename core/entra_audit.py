@@ -17,12 +17,15 @@ class EntraSecurityAuditor:
     """
     Audits Microsoft Entra ID (Azure AD) and Microsoft 365 tenant configurations.
 
-    Operates only on data you already have: a JSON export you provide via
-    --input, or simulated data if you don't. There is no Microsoft Graph API
-    connector anywhere in this module or the suite - it does not fetch
-    anything from a live tenant on its own. Producing that JSON export today
-    requires a separate script/PowerShell (e.g. via Microsoft Graph
-    PowerShell SDK) that this suite does not currently provide.
+    This class itself is data-source agnostic - it only ever sees the
+    users/roles/tenant_policies dicts passed into audit_tenant(). Three ways
+    to produce that data, in main.py's `entra` command:
+      - --live (core.graph_collector.GraphCollector): queries a real tenant
+        over Microsoft Graph using an app-only OAuth2 client credentials
+        flow. Requires an Azure AD app registration with admin-consented
+        Graph permissions (see graph_collector.py's module docstring).
+      - --input <file.json>: a JSON export you already have.
+      - neither flag: simulated/mock tenant data.
     """
 
     def __init__(self, tenant_domain: str = "tenant.onmicrosoft.com"):

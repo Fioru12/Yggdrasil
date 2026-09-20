@@ -108,17 +108,21 @@ def main():
     entra_parser.add_argument("--tenant", default="azienda.onmicrosoft.com", help="Target Microsoft 365 tenant domain")
     entra_parser.add_argument("--input", default=None, help="Path to exported tenant configuration JSON")
     entra_parser.add_argument("--simulate", action=argparse.BooleanOptionalAction, default=True, help="Use mock tenant data")
+    entra_parser.add_argument("--live", action="store_true", help="Query a real tenant via Microsoft Graph (requires --tenant-id, --client-id, --client-secret)")
+    entra_parser.add_argument("--tenant-id", default=None, help="Azure AD tenant ID (GUID), required for --live")
+    entra_parser.add_argument("--client-id", default=None, help="App registration (application) client ID, required for --live")
+    entra_parser.add_argument("--client-secret", default=None, help="App registration client secret (prefer YGGDRASIL_GRAPH_CLIENT_SECRET env var)")
 
     args = parser.parse_args()
 
     if args.command == "audit":
         run_audit(args.domain, simulate=args.simulate, ldap_args=args, fail_under=args.fail_under)
     elif args.command == "entra":
-        run_entra_audit(args.tenant, input_file=args.input, simulate=args.simulate)
+        run_entra_audit(args.tenant, input_file=args.input, simulate=args.simulate, live=args.live, graph_args=args)
     else:
         run_audit("corp.asgard.local", simulate=True)
 
-def run_entra_audit(tenant: str, input_file: str = None, simulate: bool = True):
+def run_entra_audit(tenant: str, input_file: str = None, simulate: bool = True, live: bool = False, graph_args=None):
     import json
     from core.entra_audit import EntraSecurityAuditor
     print(Colors.CYAN + "=" * 65 + Colors.ENDC)
@@ -127,7 +131,34 @@ def run_entra_audit(tenant: str, input_file: str = None, simulate: bool = True):
     print(f"{Colors.CYAN}[*]{Colors.ENDC} Tenant: {tenant}")
 
     auditor = EntraSecurityAuditor(tenant_domain=tenant)
-    if input_file and os.path.exists(input_file):
+    if live:
+        from core.graph_collector import GraphCollector, GraphConnectionError
+
+        if not graph_args.tenant_id or not graph_args.client_id:
+            print(f"{Colors.RED}[ERROR]{Colors.ENDC} --live requires --tenant-id and --client-id.")
+            sys.exit(1)
+
+        client_secret = graph_args.client_secret or os.environ.get("YGGDRASIL_GRAPH_CLIENT_SECRET")
+        if not client_secret:
+            print(f"{Colors.RED}[ERROR]{Colors.ENDC} --live requires a client secret: pass --client-secret "
+                  f"or set YGGDRASIL_GRAPH_CLIENT_SECRET.")
+            sys.exit(1)
+
+        print(f"{Colors.CYAN}[*]{Colors.ENDC} Authenticating to Microsoft Graph for tenant {graph_args.tenant_id}...")
+        collector = GraphCollector(
+            tenant_id=graph_args.tenant_id,
+            client_id=graph_args.client_id,
+            client_secret=client_secret,
+        )
+        try:
+            data = collector.collect()
+        except GraphConnectionError as exc:
+            print(f"{Colors.RED}[ERROR]{Colors.ENDC} {exc}")
+            sys.exit(1)
+        users = data["users"]
+        roles = data["roles"]
+        policies = data["policies"]
+    elif input_file and os.path.exists(input_file):
         with open(input_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         users = data.get("users", [])
