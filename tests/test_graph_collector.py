@@ -195,8 +195,6 @@ def test_fetch_directory_roles_returns_members(monkeypatch):
 
 
 def test_fetch_legacy_auth_policy_detects_blocking_policy(monkeypatch):
-    base = _collector().graph_base_url
-
     def fake_get(url, headers=None, params=None, timeout=None):
         return FakeResponse(200, {"value": [{
             "state": "enabled",
@@ -210,8 +208,6 @@ def test_fetch_legacy_auth_policy_detects_blocking_policy(monkeypatch):
 
 
 def test_fetch_legacy_auth_policy_defaults_to_allowed_when_no_blocking_policy(monkeypatch):
-    base = _collector().graph_base_url
-
     def fake_get(url, headers=None, params=None, timeout=None):
         return FakeResponse(200, {"value": []})
 
